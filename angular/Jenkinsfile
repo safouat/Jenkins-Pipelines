@@ -1,0 +1,64 @@
+ pipeline {
+    agent any
+
+    environment {
+        // SonarQube server URL and token
+        SONAR_HOST_URL = 'http://localhost:9000'
+        SONAR_TOKEN = 'sqp_ec9766f2c33fed63fec225c7845ec0fad4a69568'
+        // Adding the SonarScanner path
+        PATH = "/opt/sonar-scanner/bin:$PATH"
+    }
+
+    stages {
+        stage("Build Docker Imag") {
+            steps {
+                script {
+                    sh 'docker build -t your-angular-app1 .'
+                }
+            }
+        }
+
+       stage("Test Security with SonarQube") {
+    steps {
+        script {
+            // Running SonarQube analysis within the SonarQube environment
+            withSonarQubeEnv('SonarQube') {  // 'SonarQube' is the name of the SonarQube instance in Jenkins
+                sh '''
+                    # Ensure PATH includes SonarScanner
+                    export PATH=/opt/sonar-scanner/bin:$PATH
+                    echo "Current PATH: $PATH"
+                    which sonar-scanner
+
+                    # Run SonarScanner
+                   sonar-scanner \
+  -Dsonar.projectKey=angular \
+  -Dsonar.sources=. \
+  -Dsonar.host.url=http://localhost:9000 \
+  -Dsonar.token=sqp_ec9766f2c33fed63fec225c7845ec0fad4a69568
+                '''
+            }
+        }
+    }
+}
+     stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+
+       
+
+        stage("Deploy Docker Container") {
+            steps {
+                script {
+                    sh 'docker stop your-angular-app1-container || true'
+                    sh 'docker rm your-angular-app1-container || true'
+                    sh 'docker run -d -p 8087:80 --name your-angular-app1-container your-angular-app1'
+                }
+            }
+        }
+    }
+}
